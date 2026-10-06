@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Hydroponic AI - AgriTech Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #07120f;
+            background-image: radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(132, 204, 22, 0.06) 0%, transparent 50%);
+        }
+
+        .agri-card {
+            background: rgba(13, 28, 24, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(52, 211, 153, 0.12);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+        }
+
+        .gauge-ring {
+            transition: stroke-dashoffset 0.9s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+
+<body class="text-slate-100 min-h-screen flex selection:bg-emerald-500 selection:text-black">
+
+    <!-- Sidebar Ikon Ala Tablet AgriTech -->
+    <aside
+        class="hidden md:flex flex-col items-center py-6 px-3 w-16 bg-[#050d0a] border-r border-emerald-950/80 justify-between shrink-0">
+        <div class="space-y-6 flex flex-col items-center">
+            <div
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-lime-500 flex items-center justify-center text-slate-950 font-extrabold text-lg shadow-lg shadow-emerald-500/20">
+                🌱
+            </div>
+            <nav class="space-y-4 flex flex-col items-center text-slate-500">
+                <button
+                    class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center"
+                    title="Dashboard">📊</button>
+                <a href="/api/export"
+                    class="w-10 h-10 rounded-xl hover:bg-slate-800/60 hover:text-emerald-300 flex items-center justify-center transition"
+                    title="Export CSV">📥</a>
+            </nav>
+        </div>
+        <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" title="Server Online"></div>
+    </aside>
+
+    <!-- Konten Utama -->
+    <main class="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 overflow-x-hidden">
+
+        <!-- Header Bar -->
+        <header
+            class="agri-card px-6 py-4 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+                <div class="flex items-center gap-2.5">
+                    <h1 class="text-xl md:text-2xl font-extrabold tracking-tight text-white">
+                        Hydro<span class="text-emerald-400">Sense</span> AI
+                    </h1>
+                    <span
+                        class="px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        Kelompok 8
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Real-Time Nutrient & Water Health Diagnosis Tool</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+                <div class="flex items-center bg-[#07120f] border border-emerald-900/60 rounded-xl px-3 py-2">
+                    <span class="text-xs text-slate-400 mr-2">Tanaman:</span>
+                    <select id="plantProfile" onchange="updateThresholds()"
+                        class="bg-transparent text-xs md:text-sm font-bold text-lime-400 focus:outline-none cursor-pointer">
+                        <option value="Kangkung" class="bg-slate-900 text-white">🥬 Kangkung (1050-1200 ppm)</option>
+                        <option value="Pakcoy" class="bg-slate-900 text-white">🌿 Pakcoy (1050-1400 ppm)</option>
+                        <option value="Selada" class="bg-slate-900 text-white">🥗 Selada (560-840 ppm)</option>
+                    </select>
+                </div>
+
+                <button id="btnSimulasi" onclick="simulasiData()"
+                    class="bg-gradient-to-r from-emerald-500 to-lime-500 hover:from-emerald-400 hover:to-lime-400 text-slate-950 text-xs md:text-sm font-extrabold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-950/60 transition active:scale-95 flex items-center gap-1.5">
+                    <span>⚡</span> Simulasi Data ESP32
+                </button>
+            </div>
+        </header>
+
+        <!-- Baris 1: 4 Mini Gauge Sensor Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+            <!-- Gauge 1: TDS -->
+            <div class="agri-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase">Nutrisi (TDS)</p>
+                    <h2 class="text-2xl font-extrabold text-white mt-1"><span id="val-tds">--</span> <span
+                            class="text-xs font-normal text-slate-400">ppm</span></h2>
+                    <span id="badge-tds"
+                        class="inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300">Menunggu</span>
+                </div>
+                <div class="relative w-20 h-20 flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" stroke="#132a23" stroke-width="7" fill="none"></circle>
+                        <circle id="ring-tds" class="gauge-ring" cx="40" cy="40" r="32" stroke="#34d399"
+                            stroke-width="7" stroke-linecap="round" fill="none" stroke-dasharray="201"
+                            stroke-dashoffset="201"></circle>
+                    </svg>
+                    <span id="pct-tds" class="absolute text-xs font-bold text-emerald-300">0%</span>
+                </div>
+            </div>
+
+            <!-- Gauge 2: pH Air -->
+            <div class="agri-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase">Keasaman (pH)</p>
+                    <h2 class="text-2xl font-extrabold text-white mt-1"><span id="val-ph">--</span> <span
+                            class="text-xs font-normal text-slate-400">pH</span></h2>
+                    <span id="badge-ph"
+                        class="inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300">Menunggu</span>
+                </div>
+                <div class="relative w-20 h-20 flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" stroke="#132a23" stroke-width="7" fill="none"></circle>
+                        <circle id="ring-ph" class="gauge-ring" cx="40" cy="40" r="32" stroke="#a3e635" stroke-width="7"
+                            stroke-linecap="round" fill="none" stroke-dasharray="201" stroke-dashoffset="201"></circle>
+                    </svg>
+                    <span id="pct-ph" class="absolute text-xs font-bold text-lime-300">--</span>
+                </div>
+            </div>
+
+            <!-- Gauge 3: Suhu Air -->
+            <div class="agri-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase">Suhu Air</p>
+                    <h2 class="text-2xl font-extrabold text-white mt-1"><span id="val-wtemp">--</span> <span
+                            class="text-xs font-normal text-slate-400">°C</span></h2>
+                    <span id="badge-wtemp"
+                        class="inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300">Menunggu</span>
+                </div>
+                <div class="relative w-20 h-20 flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" stroke="#132a23" stroke-width="7" fill="none"></circle>
+                        <circle id="ring-wtemp" class="gauge-ring" cx="40" cy="40" r="32" stroke="#fbbf24"
+                            stroke-width="7" stroke-linecap="round" fill="none" stroke-dasharray="201"
+                            stroke-dashoffset="201"></circle>
+                    </svg>
+                    <span id="pct-wtemp" class="absolute text-xs font-bold text-amber-300">--</span>
+                </div>
+            </div>
+
+            <!-- Gauge 4: Kelembaban & Suhu Udara -->
+            <div class="agri-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase">Udara & Lembab</p>
+                    <h2 class="text-2xl font-extrabold text-white mt-1" id="val-atemp">--°C</h2>
+                    <span id="last-update" class="inline-block mt-2 text-[11px] text-slate-400">Update: --:--</span>
+                </div>
+                <div class="relative w-20 h-20 flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" stroke="#132a23" stroke-width="7" fill="none"></circle>
+                        <circle id="ring-hum" class="gauge-ring" cx="40" cy="40" r="32" stroke="#38bdf8"
+                            stroke-width="7" stroke-linecap="round" fill="none" stroke-dasharray="201"
+                            stroke-dashoffset="201"></circle>
+                    </svg>
+                    <span id="pct-hum" class="absolute text-xs font-bold text-sky-300">0%</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Baris 2: Big Gauge "Nutrient Health" + Panel AI & Pill Bars -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Big Circular Gauge (Tengah/Kiri - Persis Referensi) -->
+            <div class="agri-card p-6 rounded-2xl lg:col-span-4 flex flex-col items-center justify-between">
+                <div class="w-full flex justify-between items-center">
+                    <h3 class="font-bold text-sm text-slate-200">Nutrient & Water Health</h3>
+                    <span class="text-xs text-emerald-400 font-semibold">Indeks Tandon</span>
+                </div>
+
+                <div class="relative w-52 h-52 my-4 flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 200 200">
+                        <!-- Lingkaran Dasar -->
+                        <circle cx="100" cy="100" r="78" stroke="#11261f" stroke-width="18" fill="none"></circle>
+                        <!-- Lingkaran Skor Utama -->
+                        <circle id="main-health-ring" class="gauge-ring" cx="100" cy="100" r="78" stroke="#4ade80"
+                            stroke-width="18" stroke-linecap="round" fill="none" stroke-dasharray="490"
+                            stroke-dashoffset="490"></circle>
+                        <!-- Lingkaran Aksen Dalam -->
+                        <circle cx="100" cy="100" r="60" stroke="#1e3a2f" stroke-width="2" stroke-dasharray="4 6"
+                            fill="none"></circle>
+                    </svg>
+                    <div class="absolute text-center">
+                        <span id="health-score" class="text-4xl font-extrabold text-white">--%</span>
+                        <p id="health-label" class="text-xs font-bold text-emerald-400 mt-1">Menunggu Data</p>
+                    </div>
+                </div>
+
+                <div class="w-full grid grid-cols-3 gap-2 text-center text-xs pt-2 border-t border-emerald-950">
+                    <div>
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1"></span>
+                        <span class="text-slate-400">Optimal</span>
+                    </div>
+                    <div>
+                        <span class="inline-block w-2 h-2 rounded-full bg-lime-400 mr-1"></span>
+                        <span class="text-slate-400">Waspada</span>
+                    </div>
+                    <div>
+                        <span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span>
+                        <span class="text-slate-400">Kritis</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel Diagnosa Gemini LLM + Vertical Pill Bars (8 Kolom) -->
+            <div class="agri-card p-6 rounded-2xl lg:col-span-8 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between border-b border-emerald-900/60 pb-3 mb-4">
+                        <div class="flex items-center gap-2.5">
+                            <span
+                                class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">🤖</span>
+                            <div>
+                                <h3 class="font-bold text-emerald-300 text-sm md:text-base">Diagnosa & Rekomendasi
+                                    Cerdas AI (Gemini LLM)</h3>
+                                <p class="text-[11px] text-slate-400">Analisis otomatis berbasis parameter fisiologis
+                                    tanaman</p>
+                            </div>
+                        </div>
+                        <span
+                            class="hidden sm:inline-block text-xs px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/40">
+                            Gemini 3.8 Flash
+                        </span>
+                    </div>
+
+                    <div class="bg-[#06100d] border border-emerald-900/50 rounded-xl p-4">
+                        <p id="ai-advice" class="text-slate-200 text-sm leading-relaxed">
+                            Menunggu data sensor masuk... Klik tombol "Simulasi Data ESP32" di kanan atas untuk mengetes
+                            analisis AI.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Indikator Bar Kapsul Vertikal Ala Gambar Referensi -->
+                <div class="mt-6 pt-4 border-t border-emerald-950/90">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-semibold text-slate-400">Distribusi Stabilitas Parameter (8 Siklus
+                            Terakhir)</span>
+                        <span class="text-xs text-lime-400 font-medium">Real-time Bars</span>
+                    </div>
+                    <div id="pill-bars" class="grid grid-cols-8 gap-3 h-20 items-end pt-2">
+                        <!-- Diisi otomatis oleh JS -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Baris 3: Grafik Fluktuasi Dual-Axis & Tabel Log -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Grafik Garis (7 Kolom) -->
+            <div class="agri-card p-6 rounded-2xl lg:col-span-7">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-bold text-slate-200 text-sm md:text-base">📈 Grafik Fluktuasi Nutrisi (TDS) &
+                            Suhu Air</h3>
+                        <p class="text-xs text-slate-400">Hijau: TDS (ppm) • Oranye: Suhu Air (°C)</p>
+                    </div>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="sensorChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tabel Riwayat & Export (5 Kolom) -->
+            <div class="agri-card p-6 rounded-2xl lg:col-span-5 flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-bold text-slate-200 text-sm md:text-base">📋 Log Riwayat Sensor</h3>
+                        <p class="text-xs text-slate-400">Tersimpan di SQLite Database</p>
+                    </div>
+                    <a href="/api/export"
+                        class="bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5">
+                        📥 Export CSV
+                    </a>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left text-xs md:text-sm text-slate-300">
+                        <thead class="text-[11px] uppercase bg-[#06100d] text-slate-400 border-b border-emerald-950">
+                            <tr>
+                                <th class="py-2.5 px-3">Waktu</th>
+                                <th class="py-2.5 px-3">TDS</th>
+                                <th class="py-2.5 px-3">pH</th>
+                                <th class="py-2.5 px-3">Suhu Air</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-table" class="divide-y divide-emerald-950/60"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        let chart;
+        const cropTargets = {
+            Kangkung: { min: 1050, max: 1200 },
+            Pakcoy: { min: 1050, max: 1400 },
+            Selada: { min: 560, max: 840 }
+        };
+
+        function setMiniRing(ringId, percent, colorHex) {
+            const circle = document.getElementById(ringId);
+            const circumference = 201; // 2 * pi * 32
+            const clamped = Math.max(0, Math.min(percent, 100));
+            const offset = circumference - (clamped / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+            if (colorHex) circle.style.stroke = colorHex;
+        }
+
+        function setMainHealthRing(score) {
+            const circle = document.getElementById('main-health-ring');
+            const circumference = 490; // 2 * pi * 78
+            const clamped = Math.max(0, Math.min(score, 100));
+            circle.style.strokeDashoffset = circumference - (clamped / 100) * circumference;
+
+            const label = document.getElementById('health-label');
+            document.getElementById('health-score').innerText = `${Math.round(clamped)}%`;
+
+            if (clamped >= 80) {
+                circle.style.stroke = '#4ade80';
+                label.innerText = 'Kondisi Tandon Optimal';
+                label.className = 'text-xs font-bold text-emerald-400 mt-1';
+            } else if (clamped >= 60) {
+                circle.style.stroke = '#a3e635';
+                label.innerText = 'Perlu Penyesuaian Ringan';
+                label.className = 'text-xs font-bold text-lime-400 mt-1';
+            } else {
+                circle.style.stroke = '#f59e0b';
+                label.innerText = 'Peringatan: Butuh Tindakan';
+                label.className = 'text-xs font-bold text-amber-400 mt-1';
+            }
+        }
+
+        function setBadge(id, text, type) {
+            const el = document.getElementById(id);
+            el.innerText = text;
+            const styles = {
+                ok: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+                warn: 'bg-lime-500/20 text-lime-300 border border-lime-500/30',
+                crit: 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+            };
+            el.className = `inline-block mt-2 px-2 py-0.5 rounded text-[11px] font-bold ${styles[type]}`;
+        }
+
+        function updateThresholds() {
+            loadLogs();
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('sensorChart').getContext('2d');
+            const grad = ctx.createLinearGradient(0, 0, 0, 240);
+            grad.addColorStop(0, 'rgba(74, 222, 128, 0.3)');
+            grad.addColorStop(1, 'rgba(74, 222, 128, 0.0)');
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'TDS (ppm)',
+                            data: [],
+                            borderColor: '#4ade80',
+                            backgroundColor: grad,
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Suhu Air (°C)',
+                            data: [],
+                            borderColor: '#f59e0b',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+                        y: { type: 'linear', position: 'left', ticks: { color: '#4ade80' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y1: { type: 'linear', position: 'right', suggestedMin: 22, suggestedMax: 34, ticks: { color: '#f59e0b' }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        async function loadLogs() {
+            const res = await fetch('/api/logs');
+            const data = await res.json();
+            if (!data || data.length === 0) return;
+
+            const latest = data[0];
+            const plant = document.getElementById('plantProfile').value;
+            const target = cropTargets[plant];
+
+            // Isi Angka
+            document.getElementById('val-tds').innerText = latest.tds;
+            document.getElementById('val-ph').innerText = latest.ph;
+            document.getElementById('val-wtemp').innerText = latest.water_temp;
+            document.getElementById('val-atemp').innerText = `${latest.air_temp}°C`;
+            document.getElementById('ai-advice').innerText = latest.ai_advice;
+
+            const timeStr = latest.created_at.split(' ')[1] || latest.created_at;
+            document.getElementById('last-update').innerText = `Update: ${timeStr}`;
+
+            // Hitung Mini Gauges & Skor Kesehatan Total
+            let score = 100;
+
+            // 1. Evaluasi TDS
+            const tdsPct = Math.min(Math.round((latest.tds / 1500) * 100), 100);
+            document.getElementById('pct-tds').innerText = `${tdsPct}%`;
+            if (latest.tds < target.min) {
+                setMiniRing('ring-tds', tdsPct, '#a3e635');
+                setBadge('badge-tds', 'Kurang Nutrisi', 'warn');
+                score -= 18;
+            } else if (latest.tds > target.max) {
+                setMiniRing('ring-tds', tdsPct, '#f59e0b');
+                setBadge('badge-tds', 'Terlalu Pekat', 'crit');
+                score -= 20;
+            } else {
+                setMiniRing('ring-tds', tdsPct, '#34d399');
+                setBadge('badge-tds', 'Optimal', 'ok');
+            }
+
+            // 2. Evaluasi pH
+            const phPct = Math.min(Math.round((latest.ph / 10) * 100), 100);
+            document.getElementById('pct-ph').innerText = latest.ph;
+            if (latest.ph < 5.5 || latest.ph > 6.5) {
+                setMiniRing('ring-ph', phPct, '#f59e0b');
+                setBadge('badge-ph', latest.ph < 5.5 ? 'Terlalu Asam' : 'Terlalu Basa', 'crit');
+                score -= 22;
+            } else {
+                setMiniRing('ring-ph', phPct, '#a3e635');
+                setBadge('badge-ph', 'Optimal', 'ok');
+            }
+
+            // 3. Evaluasi Suhu Air
+            const wtempPct = Math.min(Math.round((latest.water_temp / 40) * 100), 100);
+            document.getElementById('pct-wtemp').innerText = `${latest.water_temp}°`;
+            if (latest.water_temp > 28.5) {
+                setMiniRing('ring-wtemp', wtempPct, '#f59e0b');
+                setBadge('badge-wtemp', 'Rawan Busuk Akar', 'crit');
+                score -= 20;
+            } else {
+                setMiniRing('ring-wtemp', wtempPct, '#34d399');
+                setBadge('badge-wtemp', 'Suhu Aman', 'ok');
+            }
+
+            // 4. Evaluasi Kelembaban
+            setMiniRing('ring-hum', latest.humidity, '#38bdf8');
+            document.getElementById('pct-hum').innerText = `${latest.humidity}%`;
+
+            // Update Big Gauge Tengah
+            setMainHealthRing(score);
+
+            // Render Vertical Pill Bars (8 data terakhir)
+            const pillContainer = document.getElementById('pill-bars');
+            const recent8 = data.slice(0, 8).reverse();
+            pillContainer.innerHTML = recent8.map(r => {
+                const h = Math.max(25, Math.min(Math.round((r.tds / 1400) * 100), 100));
+                const isOk = r.tds >= target.min && r.tds <= target.max;
+                const barColor = isOk ? 'from-emerald-400 to-emerald-600' : 'from-lime-400 to-amber-500';
+                return `
+                    <div class="flex flex-col items-center h-full justify-end group">
+                        <div class="w-full max-w-[28px] rounded-t-lg bg-gradient-to-t ${barColor} transition-all duration-500" style="height: ${h}%"></div>
+                        <span class="text-[10px] text-slate-500 mt-1 font-mono">${r.tds}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Update Tabel
+            document.getElementById('log-table').innerHTML = data.slice(0, 6).map(row => `
+                <tr class="hover:bg-emerald-950/30 transition">
+                    <td class="py-2 px-3 text-slate-400 font-mono text-xs">${row.created_at.split(' ')[1] || row.created_at}</td>
+                    <td class="py-2 px-3 font-bold text-emerald-400">${row.tds} ppm</td>
+                    <td class="py-2 px-3 font-semibold text-lime-300">${row.ph}</td>
+                    <td class="py-2 px-3 font-semibold text-amber-400">${row.water_temp}°C</td>
+                </tr>
+            `).join('');
+
+            // Update Grafik
+            const reversed = [...data].reverse();
+            chart.data.labels = reversed.map(r => r.created_at.split(' ')[1] || r.created_at);
+            chart.data.datasets[0].data = reversed.map(r => r.tds);
+            chart.data.datasets[1].data = reversed.map(r => r.water_temp);
+            chart.update();
+        }
+
+        async function simulasiData() {
+            const btn = document.getElementById('btnSimulasi');
+            btn.innerHTML = `<span class="animate-spin">⏳</span> Menganalisis...`;
+            btn.disabled = true;
+
+            const dummyPayload = {
+                plant: document.getElementById('plantProfile').value,
+                tds: Math.floor(Math.random() * (1250 - 800 + 1)) + 800,
+                ph: (Math.random() * (6.8 - 5.3) + 5.3).toFixed(1),
+                water_temp: (Math.random() * (30.5 - 25.0) + 25.0).toFixed(1),
+                air_temp: (Math.random() * (33.5 - 27.0) + 27.0).toFixed(1),
+                humidity: Math.floor(Math.random() * (85 - 60 + 1)) + 60
+            };
+
+            await fetch('/api/sensor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dummyPayload)
+            });
+
+            await loadLogs();
+            btn.innerHTML = `<span>⚡</span> Simulasi Data ESP32`;
+            btn.disabled = false;
+        }
+
+        initChart();
+        loadLogs();
+        setInterval(loadLogs, 5000);
+    </script>
+</body>
+
+</html>
